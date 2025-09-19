@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>태풍 경로 지도 (KMA + OSM)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  body { margin:0; }
+  #map { width:100vw; height:100vh; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+// ✅ 기상청 API KEY
+const apiKey = "F_PulFfXQhyz7pRX17Icvw";
+
+// ✅ 태풍 경로 API (JSON)
+const targetUrl =
+  "https://apihub.kma.go.kr/api/typ06/typhoonInfoService/getTyphoonTrackInfo"
+  + "?serviceKey=" + apiKey
+  + "&typhoonId=202309"   // 태풍 ID (예시: 2023년 9호)
+  + "&dataType=JSON";
+
+// ✅ 공개 프록시 붙이기 (CORS 우회)
+const proxyUrl = "https://r.jina.ai/"; // ⚠️ 불안정할 수 있음
+const apiUrl = proxyUrl + targetUrl;
+
+// ✅ 지도 초기화 (OpenStreetMap)
+const map = L.map("map").setView([25, 130], 5);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 18,
+  attribution: "&copy; OpenStreetMap contributors"
+}).addTo(map);
+
+// ✅ 태풍 데이터 불러오기
+fetch(apiUrl)
+  .then(res => res.json())
+  .then(data => {
+    console.log("태풍 데이터:", data);
+
+    if (!data.response || !data.response.body) {
+      alert("태풍 데이터 없음");
+      return;
+    }
+
+    const items = data.response.body.items.item;
+    const latlngs = [];
+
+    items.forEach(pt => {
+      const lat = parseFloat(pt.lat);
+      const lon = parseFloat(pt.lon);
+      latlngs.push([lat, lon]);
+
+      L.circleMarker([lat, lon], {
+        radius: 6,
+        color: "red",
+        fillColor: "orange",
+        fillOpacity: 0.8
+      })
+      .addTo(map)
+      .bindPopup(`
+        <b>${pt.tm}</b><br/>
+        중심기압: ${pt.ps} hPa<br/>
+        최대풍속: ${pt.ws} m/s
+      `);
+    });
+
+    // 경로 라인 추가
+    L.polyline(latlngs, { color: "blue" }).addTo(map);
+    map.fitBounds(latlngs);
+  })
+  .catch(err => {
+    console.error("API 오류:", err);
+    alert("태풍 API 호출 실패 (프록시 문제 가능)");
+  });
+</script>
+</body>
+</html>
